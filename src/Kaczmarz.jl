@@ -96,16 +96,21 @@ function Kaczmarz(A
   # setup denom and rowindex
   if greedy_randomized
     #A, denom, rowindex, norms = initkaczmarz(A, λ(L2), greedy_randomized, true)
-    B = (A * adjoint(A)) + (λ(L2) * I)
+
+    B = (A * adjoint(A))
+    B += (λ(L2) * I)
+
     # Calculate all denominators - B * 1/(||A||²)
     # if λ(L2) isa Vector
     #   A, denom, rowindex, norms = initkaczmarz(A, λ(L2), greedy_randomized, true)
     # else
     A, denom, rowindex, norms = initkaczmarz(A, λ(L2), greedy_randomized)
+
     #end
     for x in 1:M
       B[:, x] = (B[:, x]) * denom[x]
     end
+
   else
     A, denom, rowindex = initkaczmarz(A, λ(L2))
   end
@@ -241,7 +246,7 @@ end
 iterate_row_index_greedy(solver::Kaczmarz, index) = iterate_row_index_greedy(solver, index)
 function iterate_row_index_greedy(solver::Kaczmarz, index)
   solver.αl = solver.denom[index] * (solver.r[index])
-  calcR(solver)
+  #calcR(solver)
 end
 
 @inline done(solver::Kaczmarz, iteration::Int) = iteration >= solver.iterations
@@ -316,11 +321,16 @@ end
 # end
 
 function prepareGreedyKaczmarz(solver::Kaczmarz)
+  calcRByHand(solver)
   calcDiff(solver)
   max = calcMax(solver)
   calcEk(solver, max, solver.theta)
   calcIndexSet(solver)
   calcProbSelection(solver)
+end
+
+function calcRByHand(solver)
+  solver.r = solver.u - ((solver.A * solver.x) - (solver.ɛw * solver.vl))
 end
 
 function calcDiff(solver::Kaczmarz)

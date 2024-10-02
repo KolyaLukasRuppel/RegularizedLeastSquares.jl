@@ -97,9 +97,7 @@ function Kaczmarz(A
   if greedy_randomized
     #A, denom, rowindex, norms = initkaczmarz(A, λ(L2), greedy_randomized, true)
 
-    B = (A * adjoint(A))
-    B += (λ(L2) * I)
-
+    B = (A * adjoint(A)) + (λ(L2) * I)
     # Calculate all denominators - B * 1/(||A||²)
     # if λ(L2) isa Vector
     #   A, denom, rowindex, norms = initkaczmarz(A, λ(L2), greedy_randomized, true)
@@ -108,7 +106,7 @@ function Kaczmarz(A
 
     #end
     for x in 1:M
-      B[:, x] = (B[:, x]) * denom[x]
+      B[:, x] = B[:, x] * denom[x]
     end
 
   else
@@ -192,10 +190,10 @@ function init!(solver::Kaczmarz, b; x0=0)
       solver.r = copy(b)
     else
       # If x0 is not set to zero Vector
-      copy_b = copy(b)
+      solver.r = copy(b)
       Ax = A * solver.x
       Ax_reg = Ax .- solver.εw
-      solver.r = copy_b - Ax_reg
+      solver.r = solve.r - Ax_reg
     end
   end
 end
@@ -214,6 +212,7 @@ function iterate(solver::Kaczmarz, iteration::Int=0)
 
   if solver.randomized
     usedIndices = Int.(StatsBase.sample!(Random.GLOBAL_RNG, solver.rowIndexCycle, weights(solver.probabilities), zeros(solver.subMatrixSize), replace=false))
+
   else
     usedIndices = solver.rowIndexCycle
   end
@@ -229,23 +228,25 @@ function iterate(solver::Kaczmarz, iteration::Int=0)
   return solver.vl, iteration + 1
 end
 
+
 iterate_row_index(solver::Kaczmarz, A::AbstractLinearSolver, row, index) = iterate_row_index(solver, Matrix(A[row, :]), row, index)
 function iterate_row_index(solver::Kaczmarz, A, row, index)
   if solver.greedy_randomized
     prepareGreedyKaczmarz(solver)
-    iterate_row_index_greedy(solver, solver.i_k)
     row = solver.i_k
+    iterate_row_index_greedy(solver, solver.i_k, index)
   else
     solver.τl = dot_with_matrix_row(A, solver.x, row)
     solver.αl = solver.denom[index] * (solver.u[row] - solver.τl - solver.ɛw * solver.vl[row])
   end
   solver.vl[row] += solver.αl * solver.ɛw
   kaczmarz_update!(A, solver.x, row, solver.αl)
+
 end
 
-iterate_row_index_greedy(solver::Kaczmarz, index) = iterate_row_index_greedy(solver, index)
-function iterate_row_index_greedy(solver::Kaczmarz, index)
-  solver.αl = solver.denom[index] * (solver.r[index])
+iterate_row_index_greedy(solver::Kaczmarz, index) = iterate_row_index_greedy(solver, row, index)
+function iterate_row_index_greedy(solver::Kaczmarz, row, index)
+  solver.αl = solver.denom[solver.i_k] * (solver.r[solver.i_k])
   #calcR(solver)
 end
 
@@ -330,7 +331,8 @@ function prepareGreedyKaczmarz(solver::Kaczmarz)
 end
 
 function calcRByHand(solver)
-  solver.r = solver.u - ((solver.A * solver.x) - (solver.ɛw * solver.vl))
+  solver.r = solver.u - (solver.A * solver.x) - (solver.ɛw * solver.vl)
+  #test = solver.u - ((solver.A * solver.x) - (solver.ɛw * solver.vl))
 end
 
 function calcDiff(solver::Kaczmarz)
